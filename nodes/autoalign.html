@@ -1,0 +1,715 @@
+<script type="text/javascript">
+(function(){
+
+  /* 
+      Source:
+      https://stackoverflow.com/questions/14644558/call-javascript-function-after-script-is-loaded
+  */
+  function loadScript(url, callback) {
+      var script = document.createElement("script")
+      script.type = "text/javascript";
+
+      if (script.readyState) {  // only required for IE <9
+          script.onreadystatechange = function () {
+              if (script.readyState === "loaded" || script.readyState === "complete") {
+                  script.onreadystatechange = null;
+                  callback();
+              }
+          };
+      } else {  //Others
+          script.onload = function () {
+              callback();
+          };
+      }
+
+      script.src = url;
+      document.getElementsByTagName("head")[0].appendChild(script);
+  }
+
+  function loadDagre(cb) {
+    if (typeof dagre == "undefined") {
+        loadScript("https://cdn.openmindmap.org/thirdparty/dagre.min.js", cb)
+    } else {
+      cb()
+    }
+  }
+
+  function loadElk(cb) {
+    if (typeof ELK == "undefined") {
+        loadScript("https://cdn.openmindmap.org/thirdparty/elk.bundled.js", cb )
+    } else {
+      cb()
+    }
+  } 
+
+  function findSelectedNodes(thisNode) {
+    var selection = RED.view.selection();
+    
+    if (!selection.nodes || selection.nodes.length !== 1) {
+        RED.notify("Select exactly one node.");
+        return;
+    }
+
+    if (selection.nodes[0].id == thisNode.id || selection.nodes[0].type == thisNode.type) {
+        RED.notify("Please do not select the align node.");
+        return;
+    }
+
+    if ( selection.nodes[0].type == "group") {
+        RED.notify("Select single node, group selected currently.");
+        return;
+    }
+
+    // These values will be used to move everything around our selected node but
+    // not move everything into the top left hand corner as Elkjs would like us
+    // to do.
+    var fixedNodeId = selection.nodes[0].id;
+
+    var ns = RED.nodes.getAllFlowNodes(selection.nodes[0]);
+
+    // Convert nodes to flows.json format since all the wires, i.e. links, are 
+    // contained in one simple json format.
+    var allnodes = RED.nodes.createExportableNodeSet(ns).filter((n) => {
+        return n.type != "tab" && n.type != 'subflow' && n.type != "group"
+    });
+
+    var alledges = [];
+    
+    allnodes.forEach((n) => {
+        for (var widx = 0; widx < n.wires.length; widx++) {
+            for (var xidx = 0; xidx < n.wires[widx].length; xidx++) {
+                alledges.push({
+                    id: n.id + n.wires[widx][xidx],
+                    sources: [n.id],
+                    targets: [n.wires[widx][xidx]]
+                });
+            }
+        }
+    })
+
+    allnodes = allnodes.map((n) => {
+        return {
+            id: n.id,
+            width: document.getElementById(n.id).getBBox().width + 3,
+            height: document.getElementById(n.id).getBBox().height + 3,
+        }
+    });
+
+    return {
+      allnodes: allnodes,
+      alledges: alledges,
+      fixedNodeId: fixedNodeId
+    };
+  }
+
+  function moveNodes(payload) {
+    var children = payload.nodes;
+    var fixedNodeId = payload.fixedNodeId;
+
+    var changedNodes = [];
+
+    // Before moving anything we get the offset (x,y) - this is the amount that our
+    // fixed Node moved - our fixed node does not move, this means everything is offset
+    // by the distance it moved.
+    var offsetX = 0;
+    var offsetY = 0;
+    children.forEach((c) => {
+        if (c.id == fixedNodeId) {
+            var nd = RED.nodes.node(c.id);
+            offsetX = c.x - nd.x;
+            offsetY = c.y - nd.y;
+        }
+    });
+
+    children.forEach((c) => {
+        var nd = RED.nodes.node(c.id);
+
+        changedNodes.push({
+            n: nd,
+            ox: nd.x,
+            oy: nd.y,
+            moved: nd.moved
+        });
+
+        nd.x = c.x - offsetX;
+        nd.y = c.y - offsetY;
+        nd.dirty = true;
+    });
+
+    RED.history.push({ t: "move", nodes: changedNodes, dirty: RED.nodes.dirty() });
+    RED.nodes.dirty(true);
+    RED.view.redraw(true);
+  }
+
+  var allAlgs = [];
+
+  /* Code take from https://pastebin.com/TJRFD3mg
+   which came from https://discourse.nodered.org/t/read-flows-json-and-position-the-nodes-in-most-efficient-readable-way/78158/12
+*/
+function dagreLR(payload, callback) {
+    var allnodes = payload.allnodes;
+    var alledges = payload.alledges;
+    var fixedNodeId = payload.fixedNodeId;
+
+    var g = new dagre.graphlib.Graph();
+    g.setGraph({});
+    g.setDefaultEdgeLabel(function () { return {}; });
+
+    for (var idx = 0; idx < allnodes.length; idx++) {
+        var n = allnodes[idx];
+        g.setNode(n.id, {
+            ...n,
+        })
+    }
+
+    for (var idx = 0; idx < alledges.length; idx++) {
+        var e = alledges[idx];
+        g.setEdge(e.sources[0], e.targets[0])
+    }
+
+    g.graph().rankdir = "LR"
+    g.graph().marginx = 20
+    g.graph().marginy = 20
+
+    dagre.layout(g)
+
+    callback({
+        type: "movenodes",
+        fixedNodeId: fixedNodeId,
+        nodes: g.nodes().map(function (v) {
+             return {
+                  ...g.node(v)
+                }
+        })            
+    })
+}
+
+allAlgs.push({
+    name: "Dagre LR",
+    funct: dagreLR,
+    jslib: loadDagre,
+})
+
+  /* Code take from https://pastebin.com/TJRFD3mg
+   which came from https://discourse.nodered.org/t/read-flows-json-and-position-the-nodes-in-most-efficient-readable-way/78158/12
+*/
+function dagreLongPath(payload, callback) {
+    var allnodes = payload.allnodes;
+    var alledges = payload.alledges;
+    var fixedNodeId = payload.fixedNodeId;
+
+    var g = new dagre.graphlib.Graph();
+    g.setGraph({});
+    g.setDefaultEdgeLabel(function () { return {}; });
+
+    for (var idx = 0; idx < allnodes.length; idx++) {
+        var n = allnodes[idx];
+        g.setNode(n.id, {
+            ...n,
+        })
+    }
+
+    for (var idx = 0; idx < alledges.length; idx++) {
+        var e = alledges[idx];
+        g.setEdge(e.sources[0], e.targets[0])
+    }
+
+    g.graph().rankdir = "LR"
+    g.graph().marginx = 2
+    g.graph().marginy = 2
+    g.graph().ranker = "longest-path"
+    g.graph().nodesep = 2
+    g.graph().ranksep = 2
+
+    dagre.layout(g)
+
+    callback({
+        type: "movenodes",
+        fixedNodeId: fixedNodeId,
+        nodes: g.nodes().map(function (v) {
+            return {
+                ...g.node(v)
+            }
+        })
+    })
+}
+
+allAlgs.push({
+    name: "Dagre Longest Path",
+    funct: dagreLongPath,
+    jslib: loadDagre,
+})
+  function elkMrTree(payload, callback) {
+    var allnodes = payload.allnodes;
+    var alledges = payload.alledges;
+    var fixedNodeId = payload.fixedNodeId;
+
+    // see https://github.com/kieler/elkjs#api for more details
+    var graph = {
+        id: "root",
+        layoutOptions: {
+            'algorithm': 'mrtree',
+            'childAreaHeight': 4500,
+            'childAreaWidth': 4500,
+            "org.eclipse.elk.direction": "RIGHT",
+        },
+        children: allnodes,
+        edges: alledges
+    };
+
+    const elk = new ELK();
+
+    elk.layout(graph)
+        .then((g) => {
+            callback({
+                type: "movenodes",
+                fixedNodeId: fixedNodeId,
+                nodes: g.children
+            })
+        })
+        .catch((ex) => {
+            callback({
+                type: "error",
+                payload: ex
+            })
+        });
+}
+
+allAlgs.push({
+    name: "ELKjs Mr. Tree",
+    funct: elkMrTree,
+    jslib: loadElk,
+})
+
+  function elkjsLayeredUp(payload, callback) {
+    var allnodes = payload.allnodes;
+    var alledges = payload.alledges;
+    var fixedNodeId = payload.fixedNodeId;
+
+    // see https://github.com/kieler/elkjs#api for more details
+    var graph = {
+        id: "root",
+        layoutOptions: {
+            'algorithm': 'org.eclipse.elk.layered',
+            "elk.direction": "UP",
+            "cycleBreaking.strategy": "INTERACTIVE",
+            "layering.strategy": "INTERACTIVE",
+            "crossingMinimization.semiInteractive": true,
+            "separateConnectedComponents": true,
+            "nodePlacement.strategy": "NETWORK_SIMPLEX",
+            "spacing.nodeNode": 70,
+            "spacing.nodeNodeBetweenLayers": 25,
+            "spacing.edgeNode": 25,
+            "spacing.edgeNodeBetweenLayers": 20,
+            "spacing.edgeEdge": 20,
+            "spacing.edgeEdgeBetweenLayers": 15,
+
+
+            "elk.hierarchyHandling": "INCLUDE_CHILDREN",
+            "elk.layered.spacing.edgeNodeBetweenLayers": 40,
+            "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+            "layering.layerConstraint": "FIRST",
+        },
+        children: allnodes,
+        edges: alledges
+    };
+
+    const elk = new ELK();
+
+    elk.layout(graph)
+        .then((g) => {
+            callback({
+                type: "movenodes",
+                fixedNodeId: fixedNodeId,
+                nodes: g.children
+            })
+        })
+        .catch((g) => { callback({ type: "error", payload: g }) });
+}
+
+allAlgs.push({
+    name: "ELKjs Layered Upwards",
+    funct: elkjsLayeredUp,
+    jslib: loadElk,
+})
+
+  function elkjsLayeredDown(payload, callback) {
+    var allnodes = payload.allnodes;
+    var alledges = payload.alledges;
+    var fixedNodeId = payload.fixedNodeId;
+
+    // see https://github.com/kieler/elkjs#api for more details
+    var graph = {
+        id: "root",
+        layoutOptions: {
+            'algorithm': 'org.eclipse.elk.layered',
+            "elk.direction": "DOWN",
+            "cycleBreaking.strategy": "INTERACTIVE",
+            "layering.strategy": "INTERACTIVE",
+            "crossingMinimization.semiInteractive": true,
+            "separateConnectedComponents": true,
+            "nodePlacement.strategy": "NETWORK_SIMPLEX",
+            "spacing.nodeNode": 70,
+            "spacing.nodeNodeBetweenLayers": 25,
+            "spacing.edgeNode": 25,
+            "spacing.edgeNodeBetweenLayers": 20,
+            "spacing.edgeEdge": 20,
+            "spacing.edgeEdgeBetweenLayers": 15,
+        },
+        children: allnodes,
+        edges: alledges
+    };
+
+    const elk = new ELK();
+
+    elk.layout(graph)
+        .then((g) => {
+            callback({
+                    type: "movenodes",
+                    fixedNodeId: fixedNodeId,
+                    nodes: g.children
+            })
+        })
+        .catch((g) => { callback({ type: "error", payload: g }) });
+}
+
+allAlgs.push({
+    name: "ELKjs Layered Downwards",
+    funct: elkjsLayeredDown,
+    jslib: loadElk,
+})
+
+  function elkjsBox(payload, callback) {
+    var allnodes = payload.allnodes;
+    var alledges = payload.alledges;
+    var fixedNodeId = payload.fixedNodeId;
+
+    // see https://github.com/kieler/elkjs#api for more details
+    var graph = {
+        id: "root",
+        layoutOptions: {
+            'algorithm': 'org.eclipse.elk.box',
+            'childAreaHeight': 3000,
+            'childAreaWidth': 3000,
+        },
+        children: allnodes,
+        edges: alledges
+    };
+
+    const elk = new ELK();
+
+    elk.layout(graph)
+        .then((g) => {
+            callback({
+                type: "movenodes",
+                fixedNodeId: fixedNodeId,
+                nodes: g.children
+            })
+        })
+        .catch((g) => { callback({ type: "error", payload: g }) });
+
+}
+
+allAlgs.push({
+    name: "ELKjs Box algorithm",
+    funct: elkjsBox,
+    jslib: loadElk,
+})
+  /*
+Taken from https://github.com/node-red/node-red/pull/2267/files
+*/
+
+function layoutFlow(_payload, callback) {
+
+    var selection = RED.view.selection();
+    
+    if (!selection.nodes || selection.nodes.length !== 1) {
+        RED.notify("Select exactly one node");
+        return;
+    }
+    var ns = RED.nodes.getAllFlowNodes(selection.nodes[0]);
+
+    // Find Input node
+
+    var nodes = {};
+    var minRank = 0;
+    var stack = [];
+    var candidateInputs = {};
+    var candidateOutputs = {};
+    ns.forEach(function (n) {
+        candidateInputs[n.id] = n;
+        candidateOutputs[n.id] = n;
+        nodes[n.id] = {
+            n: n,
+            i: [],
+            o: [],
+            d: -1, // depth from start
+            r: -1, // rank order at that depth
+            downstream: 0
+        }
+    });
+    RED.nodes.eachLink(function (link) {
+        if (nodes[link.source.id] || nodes[link.target.id]) {
+            nodes[link.source.id].o.push(link.target.id);
+            nodes[link.target.id].i.push(link.source.id);
+            delete candidateInputs[link.target.id]
+            delete candidateOutputs[link.source.id]
+        }
+    })
+
+    var inputs = Object.keys(candidateInputs);
+    var outputs = Object.keys(candidateOutputs);
+
+    if (inputs.length > 1) {
+        RED.notify("Multiple start points - bailing")
+        return;
+    }
+
+    if (outputs.length === 0) {
+        RED.notify("No outputs - is this a big loop? Bailing");
+        return;
+    }
+
+    function applyDepth(id, d) {
+        if (nodes[id].d < d) {
+            nodes[id].d = d;
+            nodes[id].o.forEach(function (nid) {
+                applyDepth(nid, d + 1);
+            })
+        }
+    }
+    applyDepth(inputs[0], 0)
+
+    function calculateDownstream(id, downstream) {
+        nodes[id].downstream += downstream;
+        nodes[id].i.forEach(function (nid) {
+            calculateDownstream(nid, nodes[id].downstream + 1);
+        })
+    }
+    outputs.forEach(function (id) {
+        calculateDownstream(id, 0)
+    })
+
+    var ranks = {};
+    function rankNodes(node) {
+        if (node.r === -1) {
+            ranks[node.d] = ranks[node.d] || [];
+            node.r = ranks[node.d].length;
+            ranks[node.d].push(node);
+            node.o.sort(function (a, b) {
+                return nodes[b].downstream - nodes[a].downstream
+            })
+            node.o.forEach(function (nid) {
+                rankNodes(nodes[nid])
+            })
+        }
+    }
+    rankNodes(nodes[inputs[0]]);
+    function shuffleRanks(node) {
+        var pushed = false;
+        if (node.o.length > 1) {
+            var outputs = node.o.slice(0);
+            outputs.sort(function (a, b) {
+                if (nodes[a].d === nodes[b].d) {
+                    return nodes[a].r - nodes[b].r;
+                } else {
+                    return nodes[b].d - nodes[a].d;
+                }
+            })
+            // outputs.forEach(function(o,i) { console.log(" ",i," + "+nodes[o].n.type," d:",nodes[o].d," r:",nodes[o].r)});
+            var rank = nodes[outputs[0]].r;
+            var depth = nodes[outputs[0]].d;
+            for (var i = 1; i < outputs.length; i++) {
+                // console.log(outputs[i]);
+                var n = nodes[outputs[i]];
+                if (n.d !== depth && n.r === rank) {
+                    // need to move n down one.
+                    var r = n.r;
+                    ns.forEach(function (_n) {
+                        var nn = nodes[_n.id];
+                        if (nn.d >= n.d && nn.d < depth && nn.r >= r) {
+                            pushed = true;
+                            nn.r++;
+                        }
+                    })
+                }
+                depth = n.d;
+                rank = n.r;
+            }
+        }
+        node.o.forEach(function (n) {
+            pushed = pushed || shuffleRanks(nodes[n])
+        })
+        return pushed;
+    }
+    var shuffle = function () {
+        if (shuffleRanks(nodes[inputs[0]])) {
+            shuffle();
+        }
+    }
+    shuffle();
+
+
+    var x = nodes[inputs[0]].n.x;
+    var y = nodes[inputs[0]].n.y;
+    var changedNodes = [];
+    ns.forEach(function (n) {
+        var d = nodes[n.id].d;
+        var r = nodes[n.id].r;
+
+        changedNodes.push({
+            n: n,
+            ox: n.x,
+            oy: n.y,
+            moved: n.moved
+        });
+
+        n.x = x + d * 200;
+        n.y = y + r * 50;
+        n.dirty = true;
+        // n.dirtyStatus = true;
+        // n.status = {
+        //     text:"d"+d+" : r"+r+" : ds"+nodes[n.id].downstream
+        // }
+    });
+
+    if (changedNodes.length > 0) {
+        RED.history.push({ t: "move", nodes: changedNodes, dirty: RED.nodes.dirty() });
+        RED.nodes.dirty(true);
+        RED.view.redraw(true);
+    }
+
+    callback({ type: "noop" })
+}
+
+allAlgs.push({
+    name: "Pull Request #2267",
+    funct: layoutFlow,
+    jslib: undefined,
+})
+
+
+  RED.nodes.registerType('AutoAlign',{
+    color: '#DDD7A0',
+    icon: "font-awesome/fa-outdent",
+    category: 'introspection',
+    defaults: {
+      name: {
+        value:"",
+      },
+      algname: {
+        value: ""
+      }
+    },
+
+    inputs: 0,
+    outputs: 0,
+
+    label: function() {
+      return (this.name || this.algname || this._def.paletteLabel);
+    },
+
+    labelStyle: function() {
+      return this.name?"node_label_italic":"";
+    },
+
+    oneditprepare: function() {
+      var sltObj = $('#input-node-algname');
+      sltObj.html("");
+      for ( var idx = 0; idx < allAlgs.length; idx++ ) {
+        sltObj.append($("<option></option>").val( allAlgs[idx].name).html(allAlgs[idx].name))
+      }
+      sltObj.val(this.algname || allAlgs[0].name );
+    },
+
+    oneditcancel: function() {
+    },
+
+    oneditsave: function() {
+      this.algname = $('#input-node-algname').val();
+    },
+
+    button: {
+      enabled: function() {
+        return !this.changed
+      },
+
+      onclick: function () {
+        if (this.changed) {
+          return RED.notify(RED._("notification.warning", {
+            message: RED._("notification.warnings.undeployedChanges")
+          }), "warning");
+        }
+
+        var that = this;
+        var reqAlgName = that.algname || $('#input-node-algname').val() || allAlgs[0].name;
+        var alg = allAlgs.filter( function(o){ return o.name == reqAlgName })[0];
+
+        console.log( reqAlgName )
+        console.log( alg );
+
+        var handleFunctCall = (data) => {
+          switch (data.type) {
+            case "movenodes":
+              moveNodes(data)
+              break;
+            case "error":
+              RED.notify(data.payload, {
+                  type: "error",
+                  id: that.id,
+                  timeout: 4000
+              });
+              break;
+            case "noop":
+              break;
+            default:
+              RED.notify("Unknown action: " + data.type, {
+                  type: "error",
+                  id: that.id,
+                  timeout: 3000
+              });
+              break
+          }
+        };
+
+        var selectedNodes = findSelectedNodes(that);
+
+        if ( selectedNodes ) {
+          if ( alg.jslib ) {
+            console.log( "git jslib")
+            alg.jslib( () => {
+              alg.funct(selectedNodes, (data) => {
+                handleFunctCall(data)
+              })
+            })
+          } else {
+            console.log( "no jslib")
+            alg.funct(selectedNodes, (data) => {
+              handleFunctCall(data)
+            })
+          }
+        }
+      }
+    },
+  });
+})();
+</script>
+
+<script type="text/html" data-template-name="AutoAlign">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name"/>
+    </div>
+
+    <div class="form-row">
+      <label for="node-input-algname">
+          <span>Algorithm </span>
+      </label>
+      <select id="input-node-algname"></select>
+    </div>
+</script>
+
+<script type="text/html" data-help-name="AutoAlign">
+  <p>Auto align Node-RED flows with a click of a button.</p>
+  Automagical alignment of Node-RED flows in the editor.
+</script>

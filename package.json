@@ -1,0 +1,33 @@
+{
+  "name" : "@gregoriusrippenstein/node-red-contrib-auto-alignment",
+  "version": "0.0.1",
+  "dependencies": {
+  },
+
+  "keywords": [
+    "node-red", "auto-alignment", "alignment"
+  ],
+
+  "homepage": "https://flowhub.org",
+  "license": "SEE LICENSE IN https://github.com/gorenje/node-red-contrib-auto-alignment/blob/main/LICENSE",
+  "author": "Gerrit Riessen <nodered@spreads-the.love> (https://spread-the.love)",
+  "engines": {
+    "node": ">=8"
+  },
+
+  "node-red" : {
+    "version": ">=2.0.0",
+    "nodes": {
+      "autoalign": "nodes/autoalign.js"
+    }
+  },
+
+  "description": "Automagically align a group of nodes, sometimes called a flow.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gorenje/node-red-contrib-auto-alignment.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gorenje/node-red-contrib-auto-alignment/issues"
+  }
+}

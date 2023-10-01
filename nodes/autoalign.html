@@ -143,7 +143,7 @@
 
   var allAlgs = [];
 
-  /* Code take from https://pastebin.com/TJRFD3mg
+/* Code take from https://pastebin.com/TJRFD3mg
    which came from https://discourse.nodered.org/t/read-flows-json-and-position-the-nodes-in-most-efficient-readable-way/78158/12
 */
 function dagreLR(payload, callback) {
@@ -190,7 +190,7 @@ allAlgs.push({
     jslib: loadDagre,
 })
 
-  /* Code take from https://pastebin.com/TJRFD3mg
+/* Code take from https://pastebin.com/TJRFD3mg
    which came from https://discourse.nodered.org/t/read-flows-json-and-position-the-nodes-in-most-efficient-readable-way/78158/12
 */
 function dagreLongPath(payload, callback) {
@@ -239,7 +239,7 @@ allAlgs.push({
     funct: dagreLongPath,
     jslib: loadDagre,
 })
-  function elkMrTree(payload, callback) {
+function elkMrTree(payload, callback) {
     var allnodes = payload.allnodes;
     var alledges = payload.alledges;
     var fixedNodeId = payload.fixedNodeId;
@@ -281,7 +281,7 @@ allAlgs.push({
     jslib: loadElk,
 })
 
-  function elkjsLayeredUp(payload, callback) {
+function elkjsLayeredUp(payload, callback) {
     var allnodes = payload.allnodes;
     var alledges = payload.alledges;
     var fixedNodeId = payload.fixedNodeId;
@@ -333,7 +333,7 @@ allAlgs.push({
     jslib: loadElk,
 })
 
-  function elkjsLayeredDown(payload, callback) {
+function elkjsLayeredDown(payload, callback) {
     var allnodes = payload.allnodes;
     var alledges = payload.alledges;
     var fixedNodeId = payload.fixedNodeId;
@@ -379,7 +379,7 @@ allAlgs.push({
     jslib: loadElk,
 })
 
-  function elkjsBox(payload, callback) {
+function elkjsBox(payload, callback) {
     var allnodes = payload.allnodes;
     var alledges = payload.alledges;
     var fixedNodeId = payload.fixedNodeId;
@@ -415,7 +415,7 @@ allAlgs.push({
     funct: elkjsBox,
     jslib: loadElk,
 })
-  /*
+/*
 Taken from https://github.com/node-red/node-red/pull/2267/files
 */
 
@@ -645,9 +645,6 @@ allAlgs.push({
         var reqAlgName = that.algname || $('#input-node-algname').val() || allAlgs[0].name;
         var alg = allAlgs.filter( function(o){ return o.name == reqAlgName })[0];
 
-        console.log( reqAlgName )
-        console.log( alg );
-
         var handleFunctCall = (data) => {
           switch (data.type) {
             case "movenodes":
@@ -676,14 +673,12 @@ allAlgs.push({
 
         if ( selectedNodes ) {
           if ( alg.jslib ) {
-            console.log( "git jslib")
             alg.jslib( () => {
               alg.funct(selectedNodes, (data) => {
                 handleFunctCall(data)
               })
             })
           } else {
-            console.log( "no jslib")
             alg.funct(selectedNodes, (data) => {
               handleFunctCall(data)
             })

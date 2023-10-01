@@ -5,10 +5,10 @@
   },
 
   "keywords": [
-    "node-red", "auto-alignment", "alignment"
+    "node-red", "auto-alignment", "alignment", "auto-layout", "layout"
   ],
 
-  "homepage": "https://flowhub.org",
+  "homepage": "https://github.com/gorenje/node-red-contrib-auto-alignment/",
   "license": "SEE LICENSE IN https://github.com/gorenje/node-red-contrib-auto-alignment/blob/main/LICENSE",
   "author": "Gerrit Riessen <nodered@spreads-the.love> (https://spread-the.love)",
   "engines": {
@@ -22,7 +22,8 @@
     }
   },
 
-  "description": "Automagically align a group of nodes, sometimes called a flow.",
+  "description": "Auto-layout/alignment of a Node-RED flow.",
+  
   "repository": {
     "type": "git",
     "url": "git+https://github.com/gorenje/node-red-contrib-auto-alignment.git"

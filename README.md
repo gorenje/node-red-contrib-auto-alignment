@@ -25,7 +25,7 @@ Select the algorithm in the property panel:
 
 ![img](https://cdn.openmindmap.org/content/1696155294954_Screen_Shot_2023-10-01_at_12.14.15.png)
 
-[PR #2267](https://github.com/gorenje/cdn.openmindmap.org) is a Node-RED own auto layout algorithm which is provided as comparison. It uses neither of the libraries needed for the other algorithms.
+[Pull Request #2267](https://github.com/gorenje/cdn.openmindmap.org) is a Node-RED own auto layout algorithm which is provided as comparison. It uses neither of the libraries needed for the other algorithms.
 
 The [example flow](https://flowhub.org/f/b22f47c724215b2a) provides one node per algorithm so that each can be tested in turn.
 

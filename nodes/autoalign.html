@@ -28,7 +28,7 @@
 
   function loadDagre(cb) {
     if (typeof dagre == "undefined") {
-        loadScript("https://cdn.openmindmap.org/thirdparty/dagre.min.js", cb)
+      loadScript("https://cdn.openmindmap.org/thirdparty/dagre.min.js", cb)
     } else {
       cb()
     }
@@ -36,36 +36,66 @@
 
   function loadElk(cb) {
     if (typeof ELK == "undefined") {
-        loadScript("https://cdn.openmindmap.org/thirdparty/elk.bundled.js", cb )
+      loadScript("https://cdn.openmindmap.org/thirdparty/elk.bundled.js", cb )
     } else {
       cb()
     }
   } 
 
   function findSelectedNodes(thisNode) {
+    /*
+     * Take the selection and create a nodeset from it.
+     */
     var selection = RED.view.selection();
-    
-    if (!selection.nodes || selection.nodes.length !== 1) {
+    var fixedNodeId = undefined;
+    var ns = undefined;
+
+    if (!selection.nodes || selection.nodes.length == 0) {
         RED.notify("Select exactly one node.");
         return;
     }
 
-    if (selection.nodes[0].id == thisNode.id || selection.nodes[0].type == thisNode.type) {
-        RED.notify("Please do not select the align node.");
-        return;
+    if ( selection.nodes.length == 1 ) {
+      if (selection.nodes[0].id == thisNode.id || selection.nodes[0].type == thisNode.type) {
+          RED.notify("Please do not select the align node.");
+          return;
+      }
+
+      if ( selection.nodes[0].type == "group") {
+        ns = RED.group.getNodes(selection.nodes[0])
+        if ( ns.length == 0 ) {
+          RED.notify("Empty group selected, very funny.");
+          return;
+        }
+        fixedNodeId = ns[0].id;
+      } else {
+        ns = RED.nodes.getAllFlowNodes(selection.nodes[0])
+        fixedNodeId = selection.nodes[0].id;
+      }
     }
 
-    if ( selection.nodes[0].type == "group") {
-        RED.notify("Select single node, group selected currently.");
-        return;
+    if ( selection.nodes.length > 1 ) {
+      ns = []
+      for ( var idx = 0 ; idx < selection.nodes.length ; idx++ ) {
+        if ( selection.nodes[idx].type == "group") {
+          ns = ns.concat(RED.group.getNodes(selection.nodes[idx]))
+        } else {
+          ns.push(selection.nodes[idx])
+          fixedNodeId ||= selection.nodes[idx].id;
+        }
+      }
+
+      fixedNodeId ||= ns[0].id;
     }
 
-    // These values will be used to move everything around our selected node but
-    // not move everything into the top left hand corner as Elkjs would like us
-    // to do.
-    var fixedNodeId = selection.nodes[0].id;
+    if ( !ns ) {
+      RED.notify("No nodes selected.");
+      return;
+    }
 
-    var ns = RED.nodes.getAllFlowNodes(selection.nodes[0]);
+    /* 
+     * From here it's all nodeset based.
+     */
 
     // Convert nodes to flows.json format since all the wires, i.e. links, are 
     // contained in one simple json format.
@@ -74,15 +104,18 @@
     });
 
     var alledges = [];
-    
+    var allNodeIds = allnodes.map( d => d.id);
+
     allnodes.forEach((n) => {
         for (var widx = 0; widx < n.wires.length; widx++) {
             for (var xidx = 0; xidx < n.wires[widx].length; xidx++) {
+              if ( allNodeIds.indexOf(n.wires[widx][xidx])> -1){
                 alledges.push({
-                    id: n.id + n.wires[widx][xidx],
-                    sources: [n.id],
-                    targets: [n.wires[widx][xidx]]
+                  id: n.id + n.wires[widx][xidx],
+                  sources: [n.id],
+                  targets: [n.wires[widx][xidx]]
                 });
+              }
             }
         }
     })
@@ -152,6 +185,7 @@ function dagreLR(payload, callback) {
     var fixedNodeId = payload.fixedNodeId;
 
     var g = new dagre.graphlib.Graph();
+    
     g.setGraph({});
     g.setDefaultEdgeLabel(function () { return {}; });
 
@@ -427,7 +461,13 @@ function layoutFlow(_payload, callback) {
         RED.notify("Select exactly one node");
         return;
     }
-    var ns = RED.nodes.getAllFlowNodes(selection.nodes[0]);
+    
+    var ns = undefined;
+    if (selection.nodes[0].type == "group") {
+        ns = RED.group.getNodes(selection.nodes[0])
+    } else {
+        ns = RED.nodes.getAllFlowNodes(selection.nodes[0]);
+    }
 
     // Find Input node
 
@@ -706,5 +746,5 @@ allAlgs.push({
 
 <script type="text/html" data-help-name="AutoAlign">
   <p>Auto align Node-RED flows with a click of a button.</p>
-  Automagical alignment of Node-RED flows in the editor.
+  Automagical alignment of Node-RED flows in the editor. Select a node from a flow and click the button.
 </script>

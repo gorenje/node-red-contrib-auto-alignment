@@ -8,7 +8,7 @@
     "node-red", "auto-alignment", "alignment", "auto-layout", "layout"
   ],
 
-  "homepage": "https://github.com/gorenje/node-red-contrib-auto-alignment/",
+  "homepage": "https://github.com/gorenje/node-red-contrib-auto-alignment#README.md",
   "license": "SEE LICENSE IN https://github.com/gorenje/node-red-contrib-auto-alignment/blob/main/LICENSE",
   "author": "Gerrit Riessen <nodered@spreads-the.love> (https://spread-the.love)",
   "engines": {

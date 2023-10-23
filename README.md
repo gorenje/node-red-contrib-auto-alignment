@@ -4,7 +4,7 @@ Auto Layout Node-RED node flows.
 
 ## Deprecated
 
-This package is **deprecated** in favor of <a href="https://github.com/bartbutenaers">@bartbutenaers</a>/<a href="https://github.com/bartbutenaers/node-red-autolayout-sidebar">node-red-autolayout-sidebar</a>. As such, this codebase will not longer be maintained and all updates shall be done on the sidebar version of this node.
+This package is **deprecated** in favor of <a href="https://github.com/bartbutenaers">@bartbutenaers</a>/<a href="https://github.com/bartbutenaers/node-red-autolayout-sidebar">node-red-autolayout-sidebar</a>. As such, this codebase will no longer be maintained and all updates shall be done on the <a href="https://flows.nodered.org/node/@bartbutenaers/node-red-autolayout-sidebar">sidebar version</a> of this node.
 
 ### Warning
 

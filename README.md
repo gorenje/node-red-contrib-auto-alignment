@@ -2,6 +2,10 @@
 
 Auto Layout Node-RED node flows.
 
+## Deprecated
+
+This package is **deprecated** in favor of <a href="https://github.com/bartbutenaers">@bartbutenaers</a>/<a href="https://github.com/bartbutenaers/node-red-autolayout-sidebar">node-red-autolayout-sidebar</a>. As such, this codebase will not longer be maintained and all updates shall be done on the sidebar version of this node.
+
 ### Warning
 
 This node uses third-party Javascript libraries to do node alignment. The following libs will be loaded into your browser upon use:

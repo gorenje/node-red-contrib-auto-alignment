@@ -8,7 +8,7 @@
     "node-red", "auto-alignment", "alignment", "auto-layout", "layout"
   ],
 
-  "homepage": "https://github.com/gorenje/node-red-contrib-auto-alignment#README.md",
+  "homepage": "https://github.com/gorenje/node-red-contrib-auto-alignment#readme",
   "license": "SEE LICENSE IN https://github.com/gorenje/node-red-contrib-auto-alignment/blob/main/LICENSE",
   "author": "Gerrit Riessen <nodered@spreads-the.love> (https://spread-the.love)",
   "engines": {
@@ -22,11 +22,11 @@
     }
   },
 
-  "description": "Auto-layout/alignment of a Node-RED flow.",
+  "description": "Demonstrate how auto alignmnet could work in Node-RED.",
   
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/gorenje/node-red-contrib-auto-alignment.git"
+    "url": "https://github.com/gorenje/node-red-contrib-auto-alignment.git"
   },
   "bugs": {
     "url": "https://github.com/gorenje/node-red-contrib-auto-alignment/issues"
